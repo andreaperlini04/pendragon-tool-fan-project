@@ -1,0 +1,14 @@
+# Let Git auto-detect text files and normalize them
+* text=auto
+
+# Enforce Unix (LF) line endings for common config files
+.gitattributes text eol=lf
+.gitignore     text eol=lf
+
+# Enforce Unix (LF) for shell scripts
+/mvnw          text eol=lf
+*.sh           text eol=lf
+
+# Enforce Windows (CRLF) for Windows batch scripts
+*.cmd          text eol=crlf
+*.bat          text eol=crlf

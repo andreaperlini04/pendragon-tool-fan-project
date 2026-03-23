@@ -1,0 +1,39 @@
+# -----------------------------------------------------------------
+#  Spring Boot Server Configuration
+# -----------------------------------------------------------------
+server:
+  port: 8080 # This is the default, but good to define explicitly
+
+# -----------------------------------------------------------------
+#  Database Connection (DataSource)
+# -----------------------------------------------------------------
+spring:
+  datasource:
+    url: jdbc:postgresql://pendragon-server-app-pendragon-app.h.aivencloud.com:11229/defaultdb
+    username: avnadmin
+    password: ${DB_PASSWORD:YOUR_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  # -----------------------------------------------------------------
+  #  JPA / Hibernate Configuration (How Spring talks to the DB)
+  # -----------------------------------------------------------------
+  jpa:
+    hibernate:
+      # This is the most important setting for development:
+      # 'update': Spring will check your Java @Entity classes and 
+      #           automatically add new tables or columns to the 
+      #           database without deleting existing data.
+      # 'validate': Checks if tables match entities, throws an error if not.
+      # 'create-drop': Creates schema on startup, drops on shutdown. Good for tests.
+      # 'none': Does nothing. (Use for production with migration tools)
+      ddl-auto: update
+
+    # This is very helpful for debugging. It prints the actual SQL 
+    # queries to your console.
+    show-sql: true
+    
+    properties:
+      hibernate:
+        # Formats the SQL printed by 'show-sql' to be more readable
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
