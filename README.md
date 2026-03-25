@@ -25,7 +25,7 @@ This project leverages a modern, scalable architecture:
 
 ### Backend (Spring Boot)
 - **Framework**: Spring Boot 3.5.7 (Java 17).
-- **Persistence**: Spring Data JPA with PostgreSQL driver.
+- **Persistence**: Spring Data MongoDB.
 - **Security**: Spring Security for protected API endpoints.
 - **Utilities**: Lombok to reduce boilerplate code.
 
@@ -55,7 +55,7 @@ pendragon-tool-fan-project/
 
 ### Backend Setup
 1. Navigate to the `backend` directory.
-2. Configure your PostgreSQL database in `src/main/resources/application.yaml`.
+2. Configure your MongoDB database in `src/main/resources/application.yaml`.
 3. Run the server:
    ```sh
    ./mvnw spring-boot:run
