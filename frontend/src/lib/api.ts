@@ -63,3 +63,71 @@ export const createQuest = async (data: any) => {
   if (!response.ok) throw new Error('Network response failed');
   return response.json();
 };
+
+export const updateCharacter = async (id: string, data: any) => {
+  const response = await fetch(`${BASE_URL}/characters/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!response.ok) throw new Error('Network response failed');
+  return response.json();
+};
+
+export const deleteCharacter = async (id: string) => {
+  const response = await fetch(`${BASE_URL}/characters/${id}`, {
+    method: 'DELETE'
+  });
+  if (!response.ok) throw new Error('Network response failed');
+};
+
+export const updateSession = async (id: string, data: any) => {
+  const response = await fetch(`${BASE_URL}/sessions/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!response.ok) throw new Error('Network response failed');
+  return response.json();
+};
+
+export const deleteSession = async (id: string) => {
+  const response = await fetch(`${BASE_URL}/sessions/${id}`, {
+    method: 'DELETE'
+  });
+  if (!response.ok) throw new Error('Network response failed');
+};
+
+export const updateNPC = async (id: string, data: any) => {
+  const response = await fetch(`${BASE_URL}/npcs/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!response.ok) throw new Error('Network response failed');
+  return response.json();
+};
+
+export const deleteNPC = async (id: string) => {
+  const response = await fetch(`${BASE_URL}/npcs/${id}`, {
+    method: 'DELETE'
+  });
+  if (!response.ok) throw new Error('Network response failed');
+};
+
+export const updateQuest = async (id: string, data: any) => {
+  const response = await fetch(`${BASE_URL}/quests/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!response.ok) throw new Error('Network response failed');
+  return response.json();
+};
+
+export const deleteQuest = async (id: string) => {
+  const response = await fetch(`${BASE_URL}/quests/${id}`, {
+    method: 'DELETE'
+  });
+  if (!response.ok) throw new Error('Network response failed');
+};

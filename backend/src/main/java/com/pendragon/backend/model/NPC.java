@@ -15,4 +15,5 @@ public class NPC {
     private String relationship;
     private String description;
     private String status;
+    private String imageUrl;
 }

@@ -25,18 +25,18 @@ public class SessionController {
     }
 
     @GetMapping("/{id}")
-    public Session getById(@PathVariable String id) {
+    public Session getById(@PathVariable("id") String id) {
         return repository.findById(id).orElse(null);
     }
 
     @PutMapping("/{id}")
-    public Session update(@PathVariable String id, @RequestBody Session session) {
+    public Session update(@PathVariable("id") String id, @RequestBody Session session) {
         session.setId(id);
         return repository.save(session);
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable String id) {
+    public void delete(@PathVariable("id") String id) {
         repository.deleteById(id);
     }
 }

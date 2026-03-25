@@ -8,6 +8,9 @@ server:
 #  Database Connection (DataSource)
 # -----------------------------------------------------------------
 spring:
+  docker:
+    compose:
+      enabled: false
   data:
     mongodb:
       uri: mongodb://root:root@localhost:27017/pendragon?authSource=admin

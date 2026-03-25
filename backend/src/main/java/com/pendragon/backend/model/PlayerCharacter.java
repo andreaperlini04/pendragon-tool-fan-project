@@ -14,6 +14,7 @@ public class PlayerCharacter {
     private String id;
     private String name;
     private String player;
+    private String imageUrl;
     
     // Personal Data
     private Integer age;

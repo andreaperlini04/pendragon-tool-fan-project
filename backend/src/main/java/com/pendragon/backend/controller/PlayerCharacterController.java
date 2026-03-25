@@ -25,18 +25,18 @@ public class PlayerCharacterController {
     }
 
     @GetMapping("/{id}")
-    public PlayerCharacter getById(@PathVariable String id) {
+    public PlayerCharacter getById(@PathVariable("id") String id) {
         return repository.findById(id).orElse(null);
     }
 
     @PutMapping("/{id}")
-    public PlayerCharacter update(@PathVariable String id, @RequestBody PlayerCharacter character) {
+    public PlayerCharacter update(@PathVariable("id") String id, @RequestBody PlayerCharacter character) {
         character.setId(id);
         return repository.save(character);
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable String id) {
+    public void delete(@PathVariable("id") String id) {
         repository.deleteById(id);
     }
 }

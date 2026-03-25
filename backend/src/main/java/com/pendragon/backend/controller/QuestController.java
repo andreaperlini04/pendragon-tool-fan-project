@@ -25,18 +25,18 @@ public class QuestController {
     }
 
     @GetMapping("/{id}")
-    public Quest getById(@PathVariable String id) {
+    public Quest getById(@PathVariable("id") String id) {
         return repository.findById(id).orElse(null);
     }
 
     @PutMapping("/{id}")
-    public Quest update(@PathVariable String id, @RequestBody Quest quest) {
+    public Quest update(@PathVariable("id") String id, @RequestBody Quest quest) {
         quest.setId(id);
         return repository.save(quest);
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable String id) {
+    public void delete(@PathVariable("id") String id) {
         repository.deleteById(id);
     }
 }

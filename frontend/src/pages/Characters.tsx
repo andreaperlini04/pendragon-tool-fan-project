@@ -3,13 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Shield, User, ScrollText } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchCharacters, createCharacter } from "@/lib/api";
+import { fetchCharacters, createCharacter, updateCharacter, deleteCharacter } from "@/lib/api";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const TRAITS = ["chaste", "energetic", "forgiving", "generous", "honest", "just", "merciful", "modest", "prudent", "spiritual", "temperate", "trusting", "valorous"];
 const SKILLS = ["awareness", "boating", "compose", "courtesy", "dancing", "faerieLore", "falconry", "firstAid", "flirting", "folkLore", "gaming", "heraldry", "hunting", "intrigue", "orate", "play", "read", "recognize", "religion", "romance", "singing", "stewardship", "swimming", "tourney"];
@@ -19,14 +20,42 @@ const PASSIONS = ["loyaltyLord", "loveFamily", "hospitality", "honor"];
 const Characters = () => {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [selectedCharacter, setSelectedCharacter] = useState<any | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   const { data: characters = [], isLoading, error } = useQuery({
     queryKey: ["characters"],
     queryFn: fetchCharacters,
   });
 
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (!newOpen) {
+      setTimeout(() => {
+        setSelectedCharacter(null);
+        setIsEditing(false);
+      }, 200);
+    }
+  };
+
   const mutation = useMutation({
     mutationFn: createCharacter,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["characters"] });
+      setOpen(false);
+    },
+  });
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => updateCharacter(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["characters"] });
+      setOpen(false);
+    },
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: deleteCharacter,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["characters"] });
       setOpen(false);
@@ -58,7 +87,8 @@ const Characters = () => {
       skills: {} as Record<string, number>,
       combatSkills: {} as Record<string, number>,
       status: (form.get("status") as string) || "Active",
-      glory: parseInt((form.get("glory") as string) || "0")
+      glory: parseInt((form.get("glory") as string) || "0"),
+      imageUrl: form.get("imageUrl") as string
     };
 
     TRAITS.forEach(t => data.traits[t] = parseInt((form.get(`trait_${t}`) as string) || "10"));
@@ -66,7 +96,11 @@ const Characters = () => {
     SKILLS.forEach(s => data.skills[s] = parseInt((form.get(`skill_${s}`) as string) || "0"));
     COMBAT_SKILLS.forEach(s => data.combatSkills[s] = parseInt((form.get(`combat_${s}`) as string) || "5"));
 
-    mutation.mutate(data);
+    if (selectedCharacter && isEditing) {
+      updateMut.mutate({ id: selectedCharacter.id, data });
+    } else {
+      mutation.mutate(data);
+    }
   };
 
   if (isLoading) return <div className="container mx-auto px-4 py-8 text-center text-muted-foreground">Loading characters...</div>;
@@ -80,124 +114,151 @@ const Characters = () => {
           <p className="text-muted-foreground">The heroes of your Pendragon campaign</p>
         </div>
         
-        <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger asChild>
-            <Button className="bg-gradient-royal">
-              <Plus className="h-4 w-4 mr-2" />
-              New Character
-            </Button>
-          </SheetTrigger>
+        <Sheet open={open} onOpenChange={handleOpenChange}>
+          <Button className="bg-gradient-royal" onClick={() => {
+            setSelectedCharacter(null);
+            setIsEditing(true);
+            setOpen(true);
+          }}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Character
+          </Button>
           <SheetContent className="sm:max-w-[700px] w-[90vw] p-0 flex flex-col">
             <SheetHeader className="p-6 pb-2 border-b">
-              <SheetTitle className="text-2xl font-serif">Knight's Character Sheet</SheetTitle>
+              <SheetTitle className="text-2xl font-serif">
+                {!selectedCharacter ? "New Character" : (isEditing ? "Edit Character" : "Character Details")}
+              </SheetTitle>
             </SheetHeader>
-            <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
+            <form key={selectedCharacter?.id || 'new'} onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
               <ScrollArea className="flex-1 p-6">
-                <Tabs defaultValue="personal" className="w-full">
-                  <TabsList className="grid w-full grid-cols-4 mb-4">
-                    <TabsTrigger value="personal">Personal</TabsTrigger>
-                    <TabsTrigger value="attributes">Attributes</TabsTrigger>
-                    <TabsTrigger value="skills">Skills</TabsTrigger>
-                    <TabsTrigger value="traits">Traits</TabsTrigger>
-                  </TabsList>
+                  <Tabs defaultValue="personal" className="w-full">
+                    <TabsList className="grid w-full grid-cols-4 mb-4">
+                      <TabsTrigger value="personal">Personal</TabsTrigger>
+                      <TabsTrigger value="attributes">Attributes</TabsTrigger>
+                      <TabsTrigger value="skills">Skills</TabsTrigger>
+                      <TabsTrigger value="traits">Traits</TabsTrigger>
+                    </TabsList>
 
-                  {/* PERSONAL DATA */}
-                  <TabsContent value="personal" className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2"><Label>Character Name</Label><Input name="name" required /></div>
-                      <div className="space-y-2"><Label>Player Name</Label><Input name="player" /></div>
-                      <div className="space-y-2"><Label>Age</Label><Input name="age" type="number" defaultValue="21" /></div>
-                      <div className="space-y-2"><Label>Son Number</Label><Input name="sonNumber" type="number" defaultValue="1" /></div>
-                      <div className="space-y-2"><Label>Homeland</Label><Input name="homeland" defaultValue="Salisbury" /></div>
-                      <div className="space-y-2"><Label>Culture</Label><Input name="culture" defaultValue="Cymric" /></div>
-                      <div className="space-y-2"><Label>Religion</Label><Input name="religion" defaultValue="Pagan" /></div>
-                      <div className="space-y-2"><Label>Lord</Label><Input name="lord" /></div>
-                      <div className="space-y-2"><Label>Current Class</Label><Input name="currentClass" defaultValue="Squire" /></div>
-                      <div className="space-y-2"><Label>Current Home</Label><Input name="currentHome" /></div>
-                      <div className="space-y-2"><Label>Starting Glory</Label><Input name="glory" type="number" defaultValue="0" /></div>
-                      <div className="space-y-2"><Label>Status</Label><Input name="status" defaultValue="Active" /></div>
-                    </div>
-                  </TabsContent>
-
-                  {/* ATTRIBUTES */}
-                  <TabsContent value="attributes" className="space-y-6">
-                    <div>
-                      <h3 className="text-lg font-bold font-serif mb-3 border-b pb-1">Primary Attributes</h3>
-                      <div className="grid grid-cols-5 gap-4">
-                        <div className="space-y-1"><Label>SIZ</Label><Input name="siz" type="number" defaultValue="10" /></div>
-                        <div className="space-y-1"><Label>DEX</Label><Input name="dex" type="number" defaultValue="10" /></div>
-                        <div className="space-y-1"><Label>STR</Label><Input name="str" type="number" defaultValue="10" /></div>
-                        <div className="space-y-1"><Label>CON</Label><Input name="con" type="number" defaultValue="10" /></div>
-                        <div className="space-y-1"><Label>APP</Label><Input name="app" type="number" defaultValue="10" /></div>
+                    {/* PERSONAL DATA */}
+                    <TabsContent value="personal" className="space-y-4">
+                      <fieldset disabled={selectedCharacter && !isEditing} className="w-full h-full border-none p-0 m-0">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="col-span-2 space-y-2"><Label>Image URL (Optional)</Label><Input name="imageUrl" type="url" placeholder="https://..." defaultValue={selectedCharacter?.imageUrl || ""} /></div>
+                        <div className="space-y-2"><Label>Character Name</Label><Input name="name" required defaultValue={selectedCharacter?.name || ""} /></div>
+                        <div className="space-y-2"><Label>Player Name</Label><Input name="player" defaultValue={selectedCharacter?.player || ""} /></div>
+                        <div className="space-y-2"><Label>Age</Label><Input name="age" type="number" defaultValue={selectedCharacter?.age || "21"} /></div>
+                        <div className="space-y-2"><Label>Son Number</Label><Input name="sonNumber" type="number" defaultValue={selectedCharacter?.sonNumber || "1"} /></div>
+                        <div className="space-y-2"><Label>Homeland</Label><Input name="homeland" defaultValue={selectedCharacter?.homeland || "Salisbury"} /></div>
+                        <div className="space-y-2"><Label>Culture</Label><Input name="culture" defaultValue={selectedCharacter?.culture || "Cymric"} /></div>
+                        <div className="space-y-2"><Label>Religion</Label><Input name="religion" defaultValue={selectedCharacter?.religion || "Pagan"} /></div>
+                        <div className="space-y-2"><Label>Lord</Label><Input name="lord" defaultValue={selectedCharacter?.lord || ""} /></div>
+                        <div className="space-y-2"><Label>Current Class</Label><Input name="currentClass" defaultValue={selectedCharacter?.currentClass || "Squire"} /></div>
+                        <div className="space-y-2"><Label>Current Home</Label><Input name="currentHome" defaultValue={selectedCharacter?.currentHome || ""} /></div>
+                        <div className="space-y-2"><Label>Starting Glory</Label><Input name="glory" type="number" defaultValue={selectedCharacter?.glory || "0"} /></div>
+                        <div className="space-y-2"><Label>Status</Label><Input name="status" defaultValue={selectedCharacter?.status || "Active"} /></div>
                       </div>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold font-serif mb-3 border-b pb-1">Distinctive Features</h3>
-                      <Input name="features" placeholder="Hair, Limbs, Expression..." />
-                    </div>
-                  </TabsContent>
+                      </fieldset>
+                    </TabsContent>
 
-                  {/* SKILLS */}
-                  <TabsContent value="skills" className="space-y-6">
-                    <div className="grid grid-cols-2 gap-8">
+                    {/* ATTRIBUTES */}
+                    <TabsContent value="attributes" className="space-y-6">
+                      <fieldset disabled={selectedCharacter && !isEditing} className="w-full h-full border-none p-0 m-0">
                       <div>
-                        <h3 className="text-lg font-bold font-serif mb-3 border-b pb-1">Combat Skills</h3>
-                        <div className="space-y-2">
-                          {COMBAT_SKILLS.map(skill => (
+                        <h3 className="text-lg font-bold font-serif mb-3 border-b pb-1">Primary Attributes</h3>
+                        <div className="grid grid-cols-5 gap-4">
+                          <div className="space-y-1"><Label>SIZ</Label><Input name="siz" type="number" defaultValue={selectedCharacter?.siz || "10"} /></div>
+                          <div className="space-y-1"><Label>DEX</Label><Input name="dex" type="number" defaultValue={selectedCharacter?.dex || "10"} /></div>
+                          <div className="space-y-1"><Label>STR</Label><Input name="str" type="number" defaultValue={selectedCharacter?.str || "10"} /></div>
+                          <div className="space-y-1"><Label>CON</Label><Input name="con" type="number" defaultValue={selectedCharacter?.con || "10"} /></div>
+                          <div className="space-y-1"><Label>APP</Label><Input name="app" type="number" defaultValue={selectedCharacter?.app || "10"} /></div>
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold font-serif mb-3 border-b pb-1">Distinctive Features</h3>
+                        <Input name="features" placeholder="Hair, Limbs, Expression..." defaultValue={selectedCharacter?.features || ""} />
+                      </div>
+                      </fieldset>
+                    </TabsContent>
+
+                    {/* SKILLS */}
+                    <TabsContent value="skills" className="space-y-6">
+                      <fieldset disabled={selectedCharacter && !isEditing} className="w-full h-full border-none p-0 m-0">
+                      <div className="grid grid-cols-2 gap-8">
+                        <div>
+                          <h3 className="text-lg font-bold font-serif mb-3 border-b pb-1">Combat Skills</h3>
+                          <div className="space-y-2">
+                            {COMBAT_SKILLS.map(skill => (
+                              <div key={skill} className="flex items-center justify-between">
+                                <Label className="capitalize">{skill}</Label>
+                                <Input name={`combat_${skill}`} type="number" defaultValue={selectedCharacter?.combatSkills?.[skill] || "5"} className="w-20 h-8" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold font-serif mb-3 border-b pb-1">Passions</h3>
+                          <div className="space-y-2">
+                            {PASSIONS.map(passion => (
+                              <div key={passion} className="flex items-center justify-between">
+                                <Label className="capitalize">{passion.replace(/([A-Z])/g, ' $1').trim()}</Label>
+                                <Input name={`passion_${passion}`} type="number" defaultValue={selectedCharacter?.passions?.[passion] || "15"} className="w-20 h-8" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold font-serif mb-3 border-b pb-1">Standard Skills</h3>
+                        <div className="grid grid-cols-3 gap-x-6 gap-y-2">
+                          {SKILLS.map(skill => (
                             <div key={skill} className="flex items-center justify-between">
-                              <Label className="capitalize">{skill}</Label>
-                              <Input name={`combat_${skill}`} type="number" defaultValue="5" className="w-20 h-8" />
+                              <Label className="capitalize text-xs">{skill.replace(/([A-Z])/g, ' $1').trim()}</Label>
+                              <Input name={`skill_${skill}`} type="number" defaultValue={selectedCharacter?.skills?.[skill] || "0"} className="w-16 h-7 text-xs" />
                             </div>
                           ))}
                         </div>
                       </div>
-                      <div>
-                        <h3 className="text-lg font-bold font-serif mb-3 border-b pb-1">Passions</h3>
-                        <div className="space-y-2">
-                          {PASSIONS.map(passion => (
-                            <div key={passion} className="flex items-center justify-between">
-                              <Label className="capitalize">{passion.replace(/([A-Z])/g, ' $1').trim()}</Label>
-                              <Input name={`passion_${passion}`} type="number" defaultValue="15" className="w-20 h-8" />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold font-serif mb-3 border-b pb-1">Standard Skills</h3>
-                      <div className="grid grid-cols-3 gap-x-6 gap-y-2">
-                        {SKILLS.map(skill => (
-                          <div key={skill} className="flex items-center justify-between">
-                            <Label className="capitalize text-xs">{skill.replace(/([A-Z])/g, ' $1').trim()}</Label>
-                            <Input name={`skill_${skill}`} type="number" defaultValue="0" className="w-16 h-7 text-xs" />
+                      </fieldset>
+                    </TabsContent>
+
+                    {/* TRAITS */}
+                    <TabsContent value="traits" className="space-y-4">
+                      <fieldset disabled={selectedCharacter && !isEditing} className="w-full h-full border-none p-0 m-0">
+                      <h3 className="text-lg font-bold font-serif mb-3 border-b pb-1">Personality Traits</h3>
+                      <div className="grid grid-cols-2 gap-x-12 gap-y-2">
+                        {TRAITS.map(trait => (
+                          <div key={trait} className="flex items-center justify-between">
+                            <Label className="capitalize w-24">{trait}</Label>
+                            <Input name={`trait_${trait}`} type="number" defaultValue={selectedCharacter?.traits?.[trait] || "10"} className="w-16 h-8 text-center" />
+                            <Label className="text-muted-foreground w-24 text-right">(Opposing)</Label>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  </TabsContent>
-
-                  {/* TRAITS */}
-                  <TabsContent value="traits" className="space-y-4">
-                    <h3 className="text-lg font-bold font-serif mb-3 border-b pb-1">Personality Traits</h3>
-                    <div className="grid grid-cols-2 gap-x-12 gap-y-2">
-                      {TRAITS.map(trait => (
-                        <div key={trait} className="flex items-center justify-between">
-                          <Label className="capitalize w-24">{trait}</Label>
-                          <Input name={`trait_${trait}`} type="number" defaultValue="10" className="w-16 h-8 text-center" />
-                          <Label className="text-muted-foreground w-24 text-right">(Opposing)</Label>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-4 italic">
-                      In Pendragon, traits are paired pairs (e.g. Chaste/Lustful). Generally, they add up to 20. Enter the primary left-side trait value here.
-                    </p>
-                  </TabsContent>
-                </Tabs>
+                      <p className="text-xs text-muted-foreground mt-4 italic">
+                        In Pendragon, traits are paired pairs (e.g. Chaste/Lustful). Generally, they add up to 20. Enter the primary left-side trait value here.
+                      </p>
+                      </fieldset>
+                    </TabsContent>
+                  </Tabs>
               </ScrollArea>
-              <div className="p-6 border-t bg-secondary/20 flex justify-end">
-                <Button type="submit" disabled={mutation.isPending} className="w-32">
-                  {mutation.isPending ? "Validating..." : "Save Knight"}
-                </Button>
+              <div className="p-6 border-t bg-secondary/20 flex justify-end gap-2">
+                {!selectedCharacter ? (
+                  <Button type="submit" disabled={mutation.isPending} className="w-32">
+                    {mutation.isPending ? "Validating..." : "Save Knight"}
+                  </Button>
+                ) : !isEditing ? (
+                  <>
+                    <Button type="button" variant="destructive" onClick={() => deleteMut.mutate(selectedCharacter.id)} disabled={deleteMut.isPending}>Delete</Button>
+                    <Button type="button" onClick={(e) => { e.preventDefault(); setIsEditing(true); }}>Edit</Button>
+                  </>
+                ) : (
+                  <>
+                    <Button type="button" variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>
+                    <Button type="submit" disabled={updateMut.isPending}>
+                      {updateMut.isPending ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </>
+                )}
               </div>
             </form>
           </SheetContent>
@@ -207,77 +268,91 @@ const Characters = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {characters.length === 0 && <div className="col-span-full text-center text-muted-foreground py-12">No characters have been knighted yet.</div>}
         {characters.map((character: any) => (
-          <Card key={character.id} className="shadow-card hover:shadow-hover transition-smooth flex flex-col relative overflow-hidden group">
-            <div className={`absolute top-0 left-0 w-1 h-full ${character.status === 'Dead' ? 'bg-destructive' : 'bg-primary'}`}></div>
-            <CardHeader className="pb-3 border-b bg-secondary/10">
-              <div className="flex items-start justify-between">
-                <div>
-                  <CardTitle className="text-xl font-bold font-serif mb-1">{character.name}</CardTitle>
-                  <CardDescription className="text-sm">
-                    {character.age ? `${character.age} yo ` : ""}
-                    {character.religion} {character.culture} {character.currentClass}
-                  </CardDescription>
-                </div>
-                <Badge variant={character.status === "Dead" ? "destructive" : "default"} className="shadow-sm">
-                  {character.glory || 0} Glory
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-4 flex-1 space-y-4">
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="flex items-center gap-2"><Globe className="h-3 w-3 text-muted-foreground"/> <span>{character.homeland || 'Unknown'}</span></div>
-                <div className="flex items-center gap-2"><Shield className="h-3 w-3 text-muted-foreground"/> <span>{character.lord || 'No Lord'}</span></div>
-              </div>
+          <Card 
+            key={character.id} 
+            className="shadow-card hover:shadow-hover transition-smooth flex relative overflow-hidden group cursor-pointer"
+            onClick={() => {
+              setSelectedCharacter(character);
+              setIsEditing(false);
+              setOpen(true);
+            }}
+          >
+            <div className={`absolute top-0 left-0 w-1.5 h-full z-10 ${character.status === 'Dead' ? 'bg-destructive' : 'bg-primary'}`}></div>
+            
+            <div className="flex-shrink-0 w-32 md:w-44 bg-secondary/10 flex items-stretch border-r overflow-hidden">
+              <Avatar className="h-full w-full rounded-none border-none">
+                <AvatarImage src={character.imageUrl} alt={character.name} className="object-cover h-full w-full group-hover:scale-105 transition-transform duration-500" />
+                <AvatarFallback className="bg-gradient-royal text-primary-foreground font-serif text-5xl rounded-none w-full h-full flex items-center justify-center">
+                  {character.name ? character.name.substring(0, 2).toUpperCase() : "??"}
+                </AvatarFallback>
+              </Avatar>
+            </div>
 
-              {/* Attributes Mini-Bar */}
-              <div className="flex justify-between items-center text-xs font-mono bg-secondary/40 p-2 rounded border border-border/50">
-                <div className="flex flex-col items-center">
-                  <span className="text-[10px] text-muted-foreground">SIZ</span>
-                  <span className="font-bold">{character.siz || 10}</span>
+            <div className="flex-1 flex flex-col min-w-0">
+              <CardHeader className="pb-2 border-b bg-secondary/5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <CardTitle className="text-xl font-bold font-serif mb-1 truncate">{character.name}</CardTitle>
+                    <CardDescription className="text-xs truncate">
+                      {character.age ? `${character.age} yo ` : ""}
+                      {character.religion} {character.culture} {character.currentClass}
+                    </CardDescription>
+                  </div>
+                  <Badge variant={character.status === "Dead" ? "destructive" : "default"} className="shadow-sm flex-shrink-0">
+                    {character.glory || 0} Glory
+                  </Badge>
                 </div>
-                <div className="flex flex-col items-center">
-                  <span className="text-[10px] text-muted-foreground">DEX</span>
-                  <span className="font-bold">{character.dex || 10}</span>
+              </CardHeader>
+              <CardContent className="pt-3 flex-1 space-y-3 min-w-0">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
+                  <div className="flex items-center gap-1.5 min-w-0"><Globe className="h-3 w-3 text-muted-foreground flex-shrink-0"/> <span className="truncate">{character.homeland || 'Unknown'}</span></div>
+                  <div className="flex items-center gap-1.5 min-w-0"><Shield className="h-3 w-3 text-muted-foreground flex-shrink-0"/> <span className="truncate">{character.lord || 'No Lord'}</span></div>
                 </div>
-                <div className="flex flex-col items-center">
-                  <span className="text-[10px] text-muted-foreground">STR</span>
-                  <span className="font-bold">{character.str || 10}</span>
-                </div>
-                <div className="flex flex-col items-center">
-                  <span className="text-[10px] text-muted-foreground">CON</span>
-                  <span className="font-bold">{character.con || 10}</span>
-                </div>
-                <div className="flex flex-col items-center">
-                  <span className="text-[10px] text-muted-foreground">APP</span>
-                  <span className="font-bold">{character.app || 10}</span>
-                </div>
-              </div>
 
-              {/* Notable Sub-stats */}
-              <div className="space-y-1.5">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notable Stats</h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {character.combatSkills && character.combatSkills.sword > 5 && (
-                    <Badge variant="outline" className="text-xs font-normal">Sword {character.combatSkills.sword}</Badge>
+                {/* Attributes Mini-Bar */}
+                <div className="flex justify-between items-center text-[10px] font-mono bg-secondary/40 p-1.5 rounded border border-border/50">
+                  <div className="flex flex-col items-center flex-1">
+                    <span className="text-[9px] text-muted-foreground uppercase">SIZ</span>
+                    <span className="font-bold">{character.siz || 10}</span>
+                  </div>
+                  <div className="flex flex-col items-center flex-1">
+                    <span className="text-[9px] text-muted-foreground uppercase">DEX</span>
+                    <span className="font-bold">{character.dex || 10}</span>
+                  </div>
+                  <div className="flex flex-col items-center flex-1">
+                    <span className="text-[9px] text-muted-foreground uppercase">STR</span>
+                    <span className="font-bold">{character.str || 10}</span>
+                  </div>
+                  <div className="flex flex-col items-center flex-1">
+                    <span className="text-[9px] text-muted-foreground uppercase">CON</span>
+                    <span className="font-bold">{character.con || 10}</span>
+                  </div>
+                  <div className="flex flex-col items-center flex-1">
+                    <span className="text-[9px] text-muted-foreground uppercase">APP</span>
+                    <span className="font-bold">{character.app || 10}</span>
+                  </div>
+                </div>
+
+                {/* Notable Sub-stats */}
+                <div className="flex flex-wrap gap-1">
+                  {character.combatSkills?.sword > 5 && (
+                    <Badge variant="outline" className="text-[9px] px-1 h-4">Sword {character.combatSkills.sword}</Badge>
                   )}
-                  {character.combatSkills && character.combatSkills.horsemanship > 5 && (
-                    <Badge variant="outline" className="text-xs font-normal">Horse {character.combatSkills.horsemanship}</Badge>
+                  {character.passions?.loyaltyLord > 15 && (
+                    <Badge variant="outline" className="text-[9px] px-1 h-4 bg-primary/5">Loyalty {character.passions.loyaltyLord}</Badge>
                   )}
-                  {character.passions && character.passions.loyaltyLord > 15 && (
-                    <Badge variant="outline" className="text-xs font-normal bg-primary/5">Loyalty {character.passions.loyaltyLord}</Badge>
-                  )}
-                  {character.traits && character.traits.valorous > 15 && (
-                    <Badge variant="outline" className="text-xs font-normal bg-accent/5 border-accent/20 text-accent-foreground">Valorous {character.traits.valorous}</Badge>
+                  {character.traits?.valorous > 15 && (
+                    <Badge variant="outline" className="text-[9px] px-1 h-4 bg-accent/5 border-accent/20">Valorous {character.traits.valorous}</Badge>
                   )}
                 </div>
-              </div>
-            </CardContent>
-            {character.player && (
-              <div className="p-3 text-xs text-muted-foreground border-t bg-secondary/5 flex items-center gap-2">
-                <User className="h-3 w-3" />
-                Player: {character.player}
-              </div>
-            )}
+              </CardContent>
+              {character.player && (
+                <div className="px-3 py-1.5 text-[10px] text-muted-foreground border-t bg-secondary/5 flex items-center gap-2 mt-auto">
+                  <User className="h-2.5 w-2.5" />
+                  Player: {character.player}
+                </div>
+              )}
+            </div>
           </Card>
         ))}
       </div>

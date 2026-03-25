@@ -25,18 +25,18 @@ public class NPCController {
     }
 
     @GetMapping("/{id}")
-    public NPC getById(@PathVariable String id) {
+    public NPC getById(@PathVariable("id") String id) {
         return repository.findById(id).orElse(null);
     }
 
     @PutMapping("/{id}")
-    public NPC update(@PathVariable String id, @RequestBody NPC npc) {
+    public NPC update(@PathVariable("id") String id, @RequestBody NPC npc) {
         npc.setId(id);
         return repository.save(npc);
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable String id) {
+    public void delete(@PathVariable("id") String id) {
         repository.deleteById(id);
     }
 }
