@@ -3,80 +3,25 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Crown, Users, Skull } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { fetchNPCs, createNPC } from "@/lib/api";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
-const npcs = {
-  allies: [
-    {
-      id: 1,
-      name: "King Arthur",
-      role: "Monarch",
-      location: "Camelot",
-      relationship: "Liege Lord",
-      description: "The wise and noble king who united the realm.",
-      status: "ally",
-    },
-    {
-      id: 2,
-      name: "Merlin",
-      role: "Court Wizard",
-      location: "Camelot",
-      relationship: "Advisor",
-      description: "Ancient wizard and advisor to the king.",
-      status: "ally",
-    },
-    {
-      id: 3,
-      name: "Lady Guinevere",
-      role: "Queen",
-      location: "Camelot",
-      relationship: "Patron",
-      description: "The graceful queen, beloved of the realm.",
-      status: "ally",
-    },
-  ],
-  neutral: [
-    {
-      id: 4,
-      name: "Morgan le Fay",
-      role: "Sorceress",
-      location: "Isle of Avalon",
-      relationship: "Complicated",
-      description: "Powerful enchantress with mysterious motives.",
-      status: "neutral",
-    },
-    {
-      id: 5,
-      name: "Sir Kay",
-      role: "Seneschal",
-      location: "Camelot",
-      relationship: "Rival",
-      description: "Arthur's foster brother and seneschal of the court.",
-      status: "neutral",
-    },
-  ],
-  enemies: [
-    {
-      id: 6,
-      name: "Mordred",
-      role: "Dark Knight",
-      location: "Unknown",
-      relationship: "Enemy",
-      description: "A sinister knight plotting against the realm.",
-      status: "enemy",
-    },
-    {
-      id: 7,
-      name: "The Black Knight",
-      role: "Mysterious Warrior",
-      location: "Dark Forest",
-      relationship: "Hostile",
-      description: "An enigmatic figure who challenges all who pass.",
-      status: "enemy",
-    },
-  ],
+export type NPCData = {
+  id: string | number;
+  name: string;
+  role: string;
+  location: string;
+  relationship: string;
+  description: string;
+  status: string;
 };
 
-const NPCCard = ({ npc }: { npc: typeof npcs.allies[0] }) => (
+const NPCCard = ({ npc }: { npc: NPCData }) => (
   <Card className="shadow-card hover:shadow-hover transition-smooth">
     <CardHeader>
       <div className="flex items-start justify-between">
@@ -102,6 +47,45 @@ const NPCCard = ({ npc }: { npc: typeof npcs.allies[0] }) => (
 );
 
 const NPCs = () => {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+
+  const { data: allNPCs = [], isLoading, error } = useQuery({
+    queryKey: ["npcs"],
+    queryFn: fetchNPCs,
+  });
+
+  const mutation = useMutation({
+    mutationFn: createNPC,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["npcs"] });
+      setOpen(false);
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      name: formData.get("name") as string,
+      role: formData.get("role") as string,
+      location: formData.get("location") as string,
+      relationship: formData.get("relationship") as string,
+      description: formData.get("description") as string,
+      status: formData.get("status") as string,
+    };
+    mutation.mutate(data);
+  };
+
+  if (isLoading) return <div className="container mx-auto px-4 py-8 text-center text-muted-foreground">Loading NPCs...</div>;
+  if (error) return <div className="container mx-auto px-4 py-8 text-center text-destructive">Failed to load NPCs.</div>;
+
+  const npcs = {
+    allies: allNPCs.filter((npc: any) => npc.status === "ally"),
+    neutral: allNPCs.filter((npc: any) => npc.status === "neutral"),
+    enemies: allNPCs.filter((npc: any) => npc.status === "enemy"),
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
@@ -109,10 +93,53 @@ const NPCs = () => {
           <h1 className="text-4xl font-bold mb-2">NPCs</h1>
           <p className="text-muted-foreground">Notable characters in your campaign</p>
         </div>
-        <Button className="bg-gradient-royal">
-          <Plus className="h-4 w-4 mr-2" />
-          New NPC
-        </Button>
+        
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-gradient-royal">
+              <Plus className="h-4 w-4 mr-2" />
+              New NPC
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Create NPC</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input id="name" name="name" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role">Role</Label>
+                  <Input id="role" name="role" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="location">Location</Label>
+                  <Input id="location" name="location" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="relationship">Relationship</Label>
+                  <Input id="relationship" name="relationship" required />
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <Label htmlFor="status">Status (ally, neutral, enemy)</Label>
+                  <Input id="status" name="status" defaultValue="ally" required />
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea id="description" name="description" required />
+                </div>
+              </div>
+              <div className="flex justify-end pt-4">
+                <Button type="submit" disabled={mutation.isPending}>
+                  {mutation.isPending ? "Creating..." : "Save NPC"}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Tabs defaultValue="allies" className="space-y-6">

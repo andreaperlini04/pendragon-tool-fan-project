@@ -3,73 +3,56 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Plus, Target, CheckCircle2, Circle, Clock } from "lucide-react";
-
-const quests = [
-  {
-    id: 1,
-    title: "Retrieve the Holy Grail",
-    status: "active",
-    priority: "high",
-    progress: 45,
-    description: "Journey to the mystical realm and retrieve the legendary Holy Grail to save the kingdom from a terrible plague.",
-    objectives: [
-      { id: 1, text: "Consult with Merlin about the Grail's location", completed: true },
-      { id: 2, text: "Gather the three sacred relics", completed: true },
-      { id: 3, text: "Cross the Bridge of Testing", completed: false },
-      { id: 4, text: "Face the Guardian of the Grail", completed: false },
-    ],
-    reward: "Glory: 1000, Legendary Artifact",
-  },
-  {
-    id: 2,
-    title: "Defend Against Saxon Invasion",
-    status: "active",
-    priority: "high",
-    progress: 65,
-    description: "Saxon forces are massing at the border. Rally the knights and defend the realm.",
-    objectives: [
-      { id: 1, text: "Rally the Round Table knights", completed: true },
-      { id: 2, text: "Secure the border fortifications", completed: true },
-      { id: 3, text: "Defeat the Saxon vanguard", completed: true },
-      { id: 4, text: "Confront the Saxon warlord", completed: false },
-    ],
-    reward: "Glory: 800, Land Grant",
-  },
-  {
-    id: 3,
-    title: "Solve the Mystery of the Black Knight",
-    status: "active",
-    priority: "medium",
-    progress: 20,
-    description: "A mysterious black knight has been challenging travelers in the Dark Forest. Uncover their identity and motives.",
-    objectives: [
-      { id: 1, text: "Investigate reports in nearby villages", completed: true },
-      { id: 2, text: "Track the Black Knight to the Dark Forest", completed: false },
-      { id: 3, text: "Defeat the Black Knight in combat", completed: false },
-      { id: 4, text: "Discover their true identity", completed: false },
-    ],
-    reward: "Glory: 500, Rare Weapon",
-  },
-  {
-    id: 4,
-    title: "The Tournament of Champions",
-    status: "completed",
-    priority: "low",
-    progress: 100,
-    description: "Compete in the grand tournament to prove your valor and win the hand of Lady Elaine.",
-    objectives: [
-      { id: 1, text: "Register for the tournament", completed: true },
-      { id: 2, text: "Win the jousting rounds", completed: true },
-      { id: 3, text: "Triumph in the melee", completed: true },
-      { id: 4, text: "Claim victory and honors", completed: true },
-    ],
-    reward: "Glory: 600, Trophy",
-  },
-];
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { fetchQuests, createQuest } from "@/lib/api";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 const Quests = () => {
-  const activeQuests = quests.filter((q) => q.status === "active");
-  const completedQuests = quests.filter((q) => q.status === "completed");
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+
+  const { data: quests = [], isLoading, error } = useQuery({
+    queryKey: ["quests"],
+    queryFn: fetchQuests,
+  });
+
+  const mutation = useMutation({
+    mutationFn: createQuest,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quests"] });
+      setOpen(false);
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const objectivesText = formData.get("objectives") as string;
+    const data = {
+      title: formData.get("title") as string,
+      status: formData.get("status") as string,
+      priority: formData.get("priority") as string,
+      progress: parseInt(formData.get("progress") as string, 10),
+      description: formData.get("description") as string,
+      reward: formData.get("reward") as string,
+      objectives: objectivesText.split("\n").filter(s => s.trim() !== "").map((text, i) => ({
+        id: i + 1,
+        text: text.trim(),
+        completed: false
+      }))
+    };
+    mutation.mutate(data);
+  };
+
+  if (isLoading) return <div className="container mx-auto px-4 py-8 text-center text-muted-foreground">Loading quests...</div>;
+  if (error) return <div className="container mx-auto px-4 py-8 text-center text-destructive">Failed to load quests.</div>;
+
+  const activeQuests = quests.filter((q: any) => q.status === "active");
+  const completedQuests = quests.filter((q: any) => q.status === "completed");
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -78,10 +61,57 @@ const Quests = () => {
           <h1 className="text-4xl font-bold mb-2">Quests & Storylines</h1>
           <p className="text-muted-foreground">Track your campaign objectives</p>
         </div>
-        <Button className="bg-gradient-royal">
-          <Plus className="h-4 w-4 mr-2" />
-          New Quest
-        </Button>
+        
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-gradient-royal">
+              <Plus className="h-4 w-4 mr-2" />
+              New Quest
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Create Quest</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 space-y-2">
+                  <Label htmlFor="title">Title</Label>
+                  <Input id="title" name="title" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status (active, completed)</Label>
+                  <Input id="status" name="status" defaultValue="active" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="priority">Priority</Label>
+                  <Input id="priority" name="priority" defaultValue="medium" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="progress">Progress (%)</Label>
+                  <Input id="progress" name="progress" type="number" defaultValue="0" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reward">Reward</Label>
+                  <Input id="reward" name="reward" required />
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea id="description" name="description" required />
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <Label htmlFor="objectives">Objectives (one per line)</Label>
+                  <Textarea id="objectives" name="objectives" required />
+                </div>
+              </div>
+              <div className="flex justify-end pt-4">
+                <Button type="submit" disabled={mutation.isPending}>
+                  {mutation.isPending ? "Creating..." : "Save Quest"}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Active Quests */}

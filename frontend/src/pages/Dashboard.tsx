@@ -1,21 +1,38 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Book, Users, Scroll, Target, Clock, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const stats = [
-  { icon: Book, label: "Sessions", value: "12", color: "text-primary" },
-  { icon: Users, label: "Characters", value: "4", color: "text-accent" },
-  { icon: Scroll, label: "NPCs", value: "18", color: "text-primary" },
-  { icon: Target, label: "Quests", value: "7", color: "text-accent" },
-];
-
-const recentSessions = [
-  { id: 1, title: "The Quest Begins", date: "2024-11-01", notes: "The knights gathered at Camelot..." },
-  { id: 2, title: "Dragon's Lair", date: "2024-10-25", notes: "A fearsome dragon threatens the realm..." },
-  { id: 3, title: "Court Intrigue", date: "2024-10-18", notes: "Political machinations at court..." },
-];
+import { useQuery } from "@tanstack/react-query";
+import { fetchSessions, fetchCharacters, fetchNPCs, fetchQuests } from "@/lib/api";
+import { Link } from "react-router-dom";
 
 const Dashboard = () => {
+  const { data: sessions = [], isLoading: isLoadingS } = useQuery({ queryKey: ["sessions"], queryFn: fetchSessions });
+  const { data: characters = [], isLoading: isLoadingC } = useQuery({ queryKey: ["characters"], queryFn: fetchCharacters });
+  const { data: npcs = [], isLoading: isLoadingN } = useQuery({ queryKey: ["npcs"], queryFn: fetchNPCs });
+  const { data: quests = [], isLoading: isLoadingQ } = useQuery({ queryKey: ["quests"], queryFn: fetchQuests });
+
+  const isLoading = isLoadingS || isLoadingC || isLoadingN || isLoadingQ;
+
+  const stats = [
+    { icon: Book, label: "Sessions", value: sessions.length.toString(), color: "text-primary" },
+    { icon: Users, label: "Characters", value: characters.length.toString(), color: "text-accent" },
+    { icon: Scroll, label: "NPCs", value: npcs.length.toString(), color: "text-primary" },
+    { icon: Target, label: "Quests", value: quests.length.toString(), color: "text-accent" },
+  ];
+
+  // Sort sessions by date descending
+  const sortedSessions = [...sessions].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const recentSessions = sortedSessions.slice(0, 3);
+  
+  // Filter active quests
+  const activeQuests = quests.filter((q: any) => q.status === "active").slice(0, 5);
+  
+  const lastSessionDate = sortedSessions.length > 0 ? new Date(sortedSessions[0].date).toLocaleDateString() : "None yet";
+
+  if (isLoading) {
+    return <div className="container mx-auto px-4 py-8 text-center text-muted-foreground">Loading dashboard...</div>;
+  }
+
   return (
     <div className="container mx-auto px-4 py-8 space-y-8">
       {/* Campaign Header */}
@@ -29,7 +46,7 @@ const Dashboard = () => {
           </div>
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
-            <span>Last Session: Nov 1, 2024</span>
+            <span>Last Session: {lastSessionDate}</span>
           </div>
         </div>
       </div>
@@ -59,11 +76,14 @@ const Dashboard = () => {
               <CardTitle className="text-2xl">Recent Sessions</CardTitle>
               <CardDescription>Your latest campaign adventures</CardDescription>
             </div>
-            <Button variant="outline" size="sm">View All</Button>
+            <Link to="/sessions">
+              <Button variant="outline" size="sm">View All</Button>
+            </Link>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {recentSessions.map((session) => (
+          {recentSessions.length === 0 && <span className="text-muted-foreground">No sessions recorded yet.</span>}
+          {recentSessions.map((session: any) => (
             <div
               key={session.id}
               className="p-4 rounded-lg bg-secondary/50 hover:bg-secondary transition-smooth cursor-pointer"
@@ -71,7 +91,7 @@ const Dashboard = () => {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <h3 className="font-semibold text-lg mb-1">{session.title}</h3>
-                  <p className="text-sm text-muted-foreground mb-2">{session.notes}</p>
+                  <p className="text-sm text-muted-foreground mb-2">{session.summary}</p>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Calendar className="h-3 w-3" />
                     <span>{new Date(session.date).toLocaleDateString()}</span>
@@ -95,18 +115,13 @@ const Dashboard = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="h-2 w-2 rounded-full bg-accent" />
-              <span className="font-medium">Retrieve the Holy Grail</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="h-2 w-2 rounded-full bg-accent" />
-              <span className="font-medium">Defend against Saxon Invasion</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="h-2 w-2 rounded-full bg-muted-foreground" />
-              <span className="font-medium text-muted-foreground">Solve the Mystery of the Black Knight</span>
-            </div>
+            {activeQuests.length === 0 && <span className="text-muted-foreground">No active quests.</span>}
+            {activeQuests.map((quest: any) => (
+              <div key={quest.id} className="flex items-center gap-3">
+                <div className="h-2 w-2 rounded-full bg-accent" />
+                <span className="font-medium">{quest.title}</span>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
