@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Shield, User, ScrollText } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchCharacters, createCharacter, updateCharacter, deleteCharacter } from "@/lib/api";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-const TRAITS = ["chaste", "energetic", "forgiving", "generous", "honest", "just", "merciful", "modest", "prudent", "spiritual", "temperate", "trusting", "valorous"];
+const TRAIT_PAIRS: Record<string, string> = {
+  chaste: "lustful",
+  energetic: "lazy",
+  forgiving: "vengeful",
+  generous: "selfish",
+  honest: "deceitful",
+  just: "arbitrary",
+  merciful: "cruel",
+  modest: "proud",
+  prudent: "reckless",
+  spiritual: "worldly",
+  temperate: "indulgent",
+  trusting: "suspicious",
+  valorous: "cowardly"
+};
+const TRAITS = Object.keys(TRAIT_PAIRS);
 const SKILLS = ["awareness", "boating", "compose", "courtesy", "dancing", "faerieLore", "falconry", "firstAid", "flirting", "folkLore", "gaming", "heraldry", "hunting", "intrigue", "orate", "play", "read", "recognize", "religion", "romance", "singing", "stewardship", "swimming", "tourney"];
 const COMBAT_SKILLS = ["battle", "horsemanship", "sword", "lance", "spear", "dagger"];
 const PASSIONS = ["loyaltyLord", "loveFamily", "hospitality", "honor"];
@@ -22,11 +37,32 @@ const Characters = () => {
   const [open, setOpen] = useState(false);
   const [selectedCharacter, setSelectedCharacter] = useState<any | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [traitValues, setTraitValues] = useState<Record<string, number>>({});
+
+  const handleTraitChange = (trait: string, value: number) => {
+    const newVal = Math.max(0, Math.min(20, value));
+    setTraitValues(prev => ({
+      ...prev,
+      [trait]: newVal
+    }));
+  };
 
   const { data: characters = [], isLoading, error } = useQuery({
     queryKey: ["characters"],
     queryFn: fetchCharacters,
   });
+
+  useEffect(() => {
+    if (open) {
+      if (selectedCharacter) {
+        setTraitValues(selectedCharacter.traits || {});
+      } else {
+        const initialTraits: Record<string, number> = {};
+        TRAITS.forEach(t => initialTraits[t] = 10);
+        setTraitValues(initialTraits);
+      }
+    }
+  }, [open, selectedCharacter]);
 
   const handleOpenChange = (newOpen: boolean) => {
     setOpen(newOpen);
@@ -34,7 +70,14 @@ const Characters = () => {
       setTimeout(() => {
         setSelectedCharacter(null);
         setIsEditing(false);
+        setTraitValues({});
       }, 200);
+    } else if (selectedCharacter) {
+      setTraitValues(selectedCharacter.traits || {});
+    } else {
+      const initialTraits: Record<string, number> = {};
+      TRAITS.forEach(t => initialTraits[t] = 10);
+      setTraitValues(initialTraits);
     }
   };
 
@@ -91,7 +134,7 @@ const Characters = () => {
       imageUrl: form.get("imageUrl") as string
     };
 
-    TRAITS.forEach(t => data.traits[t] = parseInt((form.get(`trait_${t}`) as string) || "10"));
+    TRAITS.forEach(t => data.traits[t] = traitValues[t] ?? 10);
     PASSIONS.forEach(p => data.passions[p] = parseInt((form.get(`passion_${p}`) as string) || "15"));
     SKILLS.forEach(s => data.skills[s] = parseInt((form.get(`skill_${s}`) as string) || "0"));
     COMBAT_SKILLS.forEach(s => data.combatSkills[s] = parseInt((form.get(`combat_${s}`) as string) || "5"));
@@ -225,14 +268,41 @@ const Characters = () => {
                     <TabsContent value="traits" className="space-y-4">
                       <fieldset disabled={selectedCharacter && !isEditing} className="w-full h-full border-none p-0 m-0">
                       <h3 className="text-lg font-bold font-serif mb-3 border-b pb-1">Personality Traits</h3>
-                      <div className="grid grid-cols-2 gap-x-12 gap-y-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-3">
                         {TRAITS.map(trait => (
-                          <div key={trait} className="flex items-center justify-between">
-                            <Label className="capitalize w-24">{trait}</Label>
-                            <Input name={`trait_${trait}`} type="number" defaultValue={selectedCharacter?.traits?.[trait] || "10"} className="w-16 h-8 text-center" />
-                            <Label className="text-muted-foreground w-24 text-right">(Opposing)</Label>
+                          <div key={trait} className="flex items-center justify-between gap-4">
+                            <Label className={`capitalize w-20 text-xs ${traitValues[trait] >= 16 ? 'font-bold underline' : ''}`}>{trait}</Label>
+                            <div className="flex items-center gap-1.5">
+                              <Input 
+                                name={`trait_${trait}`} 
+                                type="number" 
+                                value={traitValues[trait] ?? 10} 
+                                onChange={(e) => handleTraitChange(trait, parseInt(e.target.value) || 0)}
+                                className="w-12 h-8 text-center p-1 font-bold" 
+                              />
+                              <span className="text-muted-foreground font-serif">/</span>
+                              <Input 
+                                type="number" 
+                                value={20 - (traitValues[trait] ?? 10)} 
+                                onChange={(e) => handleTraitChange(trait, 20 - (parseInt(e.target.value) || 0))}
+                                className="w-12 h-8 text-center p-1 font-bold" 
+                              />
+                            </div>
+                            <Label className={`capitalize w-20 text-right text-xs ${20 - (traitValues[trait] ?? 10) >= 16 ? 'font-bold underline' : ''}`}>{TRAIT_PAIRS[trait]}</Label>
                           </div>
                         ))}
+                      </div>
+                      <div className="mt-6 space-y-2 border-t pt-4">
+                        <div className="flex items-center justify-between">
+                          <Label className="font-serif italic font-bold">Chivalry Bonus (total=80+)</Label>
+                          <Badge variant="outline" className={TRAITS.reduce((acc, t) => acc + (traitValues[t] || 0), 0) >= 80 ? "bg-primary/20 text-primary border-primary" : ""}>
+                            {TRAITS.reduce((acc, t) => acc + (traitValues[t] || 0), 0)} / 80
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <Label className="font-serif italic font-bold">Religious Bonus (all 16+)</Label>
+                          <Badge variant="outline" className="text-xs">Required: 16+</Badge>
+                        </div>
                       </div>
                       <p className="text-xs text-muted-foreground mt-4 italic">
                         In Pendragon, traits are paired pairs (e.g. Chaste/Lustful). Generally, they add up to 20. Enter the primary left-side trait value here.
